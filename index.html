@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SmartPlan AI – Education & Event Assistant</title>
+  <title>Corona School Chat</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      background: linear-gradient(135deg, #0d1b2a, #1b2a3b, #0d1b2a);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -18,65 +18,371 @@
       color: #fff;
     }
 
-    header {
-      text-align: center;
-      padding: 20px;
-    }
-
-    header h1 {
-      font-size: 2rem;
-      background: linear-gradient(90deg, #a78bfa, #60a5fa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    header p {
-      color: #a0aec0;
-      margin-top: 6px;
-      font-size: 0.95rem;
-    }
-
-    .mode-buttons {
+    /* ── LOGIN SCREEN ── */
+    #loginScreen {
       display: flex;
-      gap: 12px;
-      margin: 16px 0;
+      flex-direction: column;
+      align-items: center;
       justify-content: center;
+      width: 100%;
+      min-height: 100vh;
     }
 
-    .mode-btn {
-      padding: 8px 20px;
+    .login-logo {
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: #4da6ff;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .login-sub {
+      color: #8ab4d4;
+      font-size: 1rem;
+      margin-bottom: 36px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .login-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 20px;
-      border: 2px solid #a78bfa;
-      background: transparent;
-      color: #a78bfa;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: all 0.2s;
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 440px;
+      backdrop-filter: blur(14px);
     }
 
-    .mode-btn.active, .mode-btn:hover {
-      background: #a78bfa;
+    .login-card h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 24px;
       color: #fff;
     }
 
-    .chat-container {
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.88rem;
+      color: #8ab4d4;
+      margin-bottom: 7px;
+    }
+
+    .form-group input,
+    .form-group select {
       width: 100%;
-      max-width: 780px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 20px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      color: #fff;
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      outline: none;
+      font-family: inherit;
+      transition: border 0.2s;
+    }
+
+    .form-group input::placeholder { color: #4a6a84; }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: #4da6ff;
+    }
+
+    .form-group select option {
+      background: #1b2a3b;
+      color: #fff;
+    }
+
+    .login-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #1a6fc4, #4da6ff);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      padding: 13px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-top: 6px;
+    }
+
+    .login-btn:hover { opacity: 0.88; }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 0.78rem;
+      color: #4a6a84;
+    }
+
+    .error-msg {
+      color: #ff6b6b;
+      font-size: 0.83rem;
+      margin-top: 6px;
+      display: none;
+    }
+
+    .petnan-btn {
+      width: 100%;
+      background: transparent;
+      border: 1px solid rgba(77,166,255,0.35);
+      border-radius: 12px;
+      color: #4da6ff;
+      padding: 11px;
+      font-size: 0.93rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 10px;
+    }
+
+    .petnan-btn:hover {
+      background: rgba(77,166,255,0.1);
+      border-color: #4da6ff;
+    }
+
+    /* ── PETNAN MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal-box {
+      background: #1b2a3b;
+      border: 1px solid rgba(77,166,255,0.25);
+      border-radius: 18px;
+      padding: 30px 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .modal-box h3 {
+      font-size: 1.1rem;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .modal-box p {
+      font-size: 0.82rem;
+      color: #4a6a84;
+      margin-bottom: 18px;
+    }
+
+    .modal-box textarea {
+      width: 100%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 10px;
+      color: #fff;
+      padding: 11px 13px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      min-height: 90px;
+      transition: border 0.2s;
+    }
+
+    .modal-box textarea:focus { border-color: #4da6ff; }
+    .modal-box textarea::placeholder { color: #4a6a84; }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .modal-send-btn {
+      flex: 1;
+      background: linear-gradient(135deg, #1a6fc4, #4da6ff);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      padding: 11px;
+      font-size: 0.93rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.2s;
+    }
+
+    .modal-send-btn:hover { opacity: 0.85; }
+
+    .modal-cancel-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      color: #8ab4d4;
+      padding: 11px 18px;
+      font-size: 0.93rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .modal-cancel-btn:hover { background: rgba(255,100,100,0.1); color: #ff9999; }
+
+    .modal-success {
+      display: none;
+      text-align: center;
+      padding: 10px 0 4px;
+    }
+
+    .modal-success p { color: #4da6ff; font-size: 0.95rem; margin-top: 8px; }
+
+    /* ── MAIN APP ── */
+    #appScreen {
+      display: none;
+      flex-direction: column;
+      width: 100%;
+      min-height: 100vh;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: rgba(0,0,0,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .topbar-logo {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #4da6ff;
+    }
+
+    .topbar-user {
+      font-size: 0.88rem;
+      color: #8ab4d4;
+    }
+
+    .topbar-user span {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .logout-btn {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      color: #8ab4d4;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .logout-btn:hover { background: rgba(255,100,100,0.2); color: #ff9999; }
+
+    /* ── LAYOUT ── */
+    .app-layout {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 58px);
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 220px;
+      background: rgba(0,0,0,0.25);
+      border-right: 1px solid rgba(255,255,255,0.08);
       display: flex;
       flex-direction: column;
-      height: 520px;
-      backdrop-filter: blur(10px);
+      padding: 16px 0;
+      flex-shrink: 0;
+    }
+
+    .sidebar-title {
+      font-size: 0.72rem;
+      color: #4a6a84;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 0 18px 10px;
+    }
+
+    .class-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 18px;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: #8ab4d4;
+      font-size: 0.93rem;
+      font-family: inherit;
+      text-align: left;
+      transition: all 0.18s;
+      border-left: 3px solid transparent;
+      width: 100%;
+    }
+
+    .class-btn:hover {
+      background: rgba(77,166,255,0.1);
+      color: #fff;
+    }
+
+    .class-btn.active {
+      background: rgba(77,166,255,0.15);
+      color: #4da6ff;
+      border-left-color: #4da6ff;
+      font-weight: 600;
+    }
+
+    .class-icon {
+      font-size: 1.1rem;
+    }
+
+    /* ── CHAT AREA ── */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
-      margin: 0 16px;
+    }
+
+    .chat-header {
+      padding: 14px 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.15);
+    }
+
+    .chat-header h2 {
+      font-size: 1.1rem;
+      color: #fff;
+    }
+
+    .chat-header p {
+      font-size: 0.78rem;
+      color: #4a6a84;
+      margin-top: 2px;
     }
 
     .chat-messages {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 20px 22px;
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -84,7 +390,7 @@
     }
 
     .chat-messages::-webkit-scrollbar { width: 5px; }
-    .chat-messages::-webkit-scrollbar-thumb { background: #a78bfa55; border-radius: 10px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: #4da6ff33; border-radius: 10px; }
 
     .message {
       display: flex;
@@ -107,29 +413,47 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.1rem;
+      font-size: 1rem;
       flex-shrink: 0;
+      font-weight: 700;
+      text-transform: uppercase;
     }
 
-    .avatar.ai   { background: linear-gradient(135deg, #a78bfa, #60a5fa); }
-    .avatar.user { background: linear-gradient(135deg, #f472b6, #fb923c); }
+    .avatar.ai   { background: linear-gradient(135deg, #1a6fc4, #4da6ff); }
+    .avatar.user { background: linear-gradient(135deg, #0d4a8a, #1a6fc4); }
 
     .bubble {
-      max-width: 75%;
-      padding: 12px 16px;
-      border-radius: 16px;
+      max-width: 72%;
+      padding: 11px 15px;
+      border-radius: 14px;
       font-size: 0.92rem;
       line-height: 1.6;
       white-space: pre-wrap;
     }
 
-    .message.ai   .bubble { background: rgba(167,139,250,0.15); border: 1px solid rgba(167,139,250,0.3); }
-    .message.user .bubble { background: rgba(96,165,250,0.2);   border: 1px solid rgba(96,165,250,0.3); text-align: right; }
+    .message.ai   .bubble {
+      background: rgba(77,166,255,0.1);
+      border: 1px solid rgba(77,166,255,0.25);
+    }
+
+    .message.user .bubble {
+      background: rgba(77,166,255,0.18);
+      border: 1px solid rgba(77,166,255,0.3);
+      text-align: right;
+    }
+
+    .msg-name {
+      font-size: 0.72rem;
+      color: #4a6a84;
+      margin-bottom: 3px;
+    }
+
+    .message.user .msg-name { text-align: right; }
 
     .typing-indicator span {
       display: inline-block;
-      width: 8px; height: 8px;
-      background: #a78bfa;
+      width: 7px; height: 7px;
+      background: #4da6ff;
       border-radius: 50%;
       margin: 0 2px;
       animation: bounce 1.2s infinite;
@@ -139,21 +463,22 @@
 
     @keyframes bounce {
       0%, 80%, 100% { transform: translateY(0); }
-      40%           { transform: translateY(-8px); }
+      40%           { transform: translateY(-7px); }
     }
 
+    /* ── INPUT ── */
     .chat-input-area {
       display: flex;
       gap: 10px;
-      padding: 14px 16px;
-      border-top: 1px solid rgba(255,255,255,0.1);
+      padding: 14px 18px;
+      border-top: 1px solid rgba(255,255,255,0.08);
       background: rgba(0,0,0,0.2);
     }
 
     .chat-input-area textarea {
       flex: 1;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.13);
       border-radius: 12px;
       color: #fff;
       padding: 10px 14px;
@@ -162,12 +487,14 @@
       outline: none;
       font-family: inherit;
       max-height: 100px;
+      transition: border 0.2s;
     }
 
-    .chat-input-area textarea::placeholder { color: #718096; }
+    .chat-input-area textarea:focus { border-color: #4da6ff; }
+    .chat-input-area textarea::placeholder { color: #4a6a84; }
 
     .send-btn {
-      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      background: linear-gradient(135deg, #1a6fc4, #4da6ff);
       border: none;
       border-radius: 12px;
       color: #fff;
@@ -178,132 +505,389 @@
     }
 
     .send-btn:hover { opacity: 0.85; }
-    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-    .quick-prompts {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 10px 16px 0;
-      justify-content: center;
+    @media (max-width: 600px) {
+      .sidebar { width: 60px; }
+      .sidebar-title, .class-btn span.class-label { display: none; }
+      .login-card { padding: 28px 20px; }
     }
-
-    .quick-btn {
-      background: rgba(167,139,250,0.12);
-      border: 1px solid rgba(167,139,250,0.35);
-      color: #c4b5fd;
-      border-radius: 20px;
-      padding: 5px 14px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .quick-btn:hover { background: rgba(167,139,250,0.3); }
-
-    .api-notice {
-      margin-top: 14px;
-      font-size: 0.78rem;
-      color: #718096;
-      text-align: center;
-    }
-
-    .api-notice a { color: #a78bfa; text-decoration: none; }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>🎓 SmartPlan AI</h1>
-  <p>Your intelligent assistant for Education & Event Planning</p>
+<!-- ══════════════ LOGIN SCREEN ══════════════ -->
+<div id="loginScreen">
+  <div class="login-logo">Corona School Chat</div>
+  <div class="login-sub">School Communication Platform</div>
 
-  <div class="mode-buttons">
-    <button class="mode-btn active" onclick="setMode('general',this)">💬 General</button>
-    <button class="mode-btn" onclick="setMode('education',this)">📚 Education</button>
-    <button class="mode-btn" onclick="setMode('events',this)">🎉 Events</button>
+  <div class="login-card">
+    <h2>Sign in to continue</h2>
+
+    <div class="form-group">
+      <label for="fullNameInput">Your Full Name</label>
+      <input type="text" id="fullNameInput" placeholder="e.g. John Adebayo" autocomplete="off" />
+      <div class="error-msg" id="nameError">Please enter your full name (first and last name).</div>
+    </div>
+
+    <div class="form-group">
+      <label for="classSelect">Select Your Class</label>
+      <select id="classSelect">
+        <option value="">-- Pick your class --</option>
+        <option value="1">Class 1</option>
+        <option value="2">Class 2</option>
+        <option value="3">Class 3</option>
+        <option value="4">Class 4</option>
+        <option value="5">Class 5</option>
+        <option value="6">Class 6</option>
+      </select>
+      <div class="error-msg" id="classError">Please select your class.</div>
+    </div>
+
+    <button class="login-btn" onclick="handleLogin()">Enter Chat</button>
+
+    <button class="petnan-btn" onclick="openPetnan()">💬 Ask Petnan for Something</button>
+
+    <div class="login-footer">Corona School Chat &bull; Powered by AI</div>
   </div>
-</header>
-
-<div class="quick-prompts">
-  <button class="quick-btn" onclick="quickSend('Create a 30-day study plan for learning Python')">📅 Study Plan</button>
-  <button class="quick-btn" onclick="quickSend('Plan a school graduation event for 200 people')">🎓 Graduation Event</button>
-  <button class="quick-btn" onclick="quickSend('Suggest a curriculum for a beginner web development course')">💻 Course Curriculum</button>
-  <button class="quick-btn" onclick="quickSend('Help me plan a corporate training workshop')">🏢 Workshop</button>
-  <button class="quick-btn" onclick="quickSend('Create a timeline for a science fair event')">🔬 Science Fair</button>
 </div>
 
-<div class="chat-container">
-  <div class="chat-messages" id="chatMessages">
-    <div class="message ai">
-      <div class="avatar ai">🤖</div>
-      <div class="bubble">
-Hello! I'm <strong>SmartPlan AI</strong> — your intelligent assistant for education and event planning. 🎓🎉
+<!-- ══════════════ PETNAN MODAL ══════════════ -->
+<div class="modal-overlay" id="petnanModal">
+  <div class="modal-box">
+    <div id="petnanForm">
+      <h3>💬 Ask Petnan for Something</h3>
+      <p>Type your message or request below and Petnan will see it.</p>
+      <textarea id="petnanMessage" placeholder="e.g. I need help with my password, or I have a question about class..." rows="4"></textarea>
+      <div class="modal-actions">
+        <button class="modal-send-btn" onclick="sendToPetnan()">Send Message</button>
+        <button class="modal-cancel-btn" onclick="closePetnan()">Cancel</button>
+      </div>
+    </div>
+    <div class="modal-success" id="petnanSuccess">
+      <div style="font-size:2.5rem">✅</div>
+      <p>Your message has been sent to Petnan!</p>
+      <button class="modal-cancel-btn" style="margin-top:14px;width:100%" onclick="closePetnan()">Close</button>
+    </div>
+  </div>
+</div>
 
-Here's what I can help you with:
-• 📚 <strong>Education Planning</strong> — study plans, curricula, learning paths, exam prep
-• 🎉 <strong>Event Planning</strong> — timelines, budgets, checklists, vendor tips
-• 💡 <strong>Smart Advice</strong> — personalized recommendations and strategies
+<!-- ══════════════ MAIN APP ══════════════ -->
+<div id="appScreen">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-logo">🏫 Corona School Chat</div>
+    <div class="topbar-user">Signed in as <span id="displayName"></span></div>
+    <button class="logout-btn" onclick="logout()">Sign Out</button>
+  </div>
 
-Pick a mode above or just ask me anything to get started!
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-title">Classes</div>
+      <button class="class-btn" data-class="1" onclick="switchClass(1)">
+        <span class="class-icon">📘</span><span class="class-label">Class 1</span>
+      </button>
+      <button class="class-btn" data-class="2" onclick="switchClass(2)">
+        <span class="class-icon">📗</span><span class="class-label">Class 2</span>
+      </button>
+      <button class="class-btn" data-class="3" onclick="switchClass(3)">
+        <span class="class-icon">📙</span><span class="class-label">Class 3</span>
+      </button>
+      <button class="class-btn" data-class="4" onclick="switchClass(4)">
+        <span class="class-icon">📕</span><span class="class-label">Class 4</span>
+      </button>
+      <button class="class-btn" data-class="5" onclick="switchClass(5)">
+        <span class="class-icon">📓</span><span class="class-label">Class 5</span>
+      </button>
+      <button class="class-btn" data-class="6" onclick="switchClass(6)">
+        <span class="class-icon">📔</span><span class="class-label">Class 6</span>
+      </button>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="chat-area">
+      <div class="chat-header">
+        <h2 id="chatRoomTitle">Class Chat</h2>
+        <p id="chatRoomDesc">Ask questions, get help from the AI assistant, and discuss with your class.</p>
+      </div>
+
+      <div class="chat-messages" id="chatMessages"></div>
+
+      <div class="chat-input-area">
+        <textarea id="userInput" placeholder="Type your message..." rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
       </div>
     </div>
   </div>
-
-  <div class="chat-input-area">
-    <textarea id="userInput" placeholder="Ask me about education or event planning..." rows="1"
-      onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-    <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
-  </div>
 </div>
 
-<p class="api-notice">
-  Powered by OpenAI GPT-4 &nbsp;|&nbsp;
-  Add your API key in <code>server.js</code> or <code>.env</code> &nbsp;|&nbsp;
-  <a href="https://platform.openai.com/api-keys" target="_blank">Get API Key →</a>
-</p>
-
 <script>
-  let currentMode = 'general';
-  let conversationHistory = [];
+  // ── State ──────────────────────────────────────────────────────────────────
+  let currentUser  = '';
+  let currentClass = 1;
 
-  const systemPrompts = {
-    general: `You are SmartPlan AI, a highly intelligent and friendly assistant specializing in education planning and event planning. You provide detailed, actionable, and well-structured advice. You are warm, encouraging, and professional. Always format your responses clearly using bullet points, numbered lists, or sections when helpful.`,
+  // Per-class chat histories (so switching class keeps its own conversation)
+  const classHistories = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
 
-    education: `You are SmartPlan AI in Education Mode. You are an expert educational consultant and curriculum designer. Help users with:
-- Creating personalized study plans and learning schedules
-- Designing course curricula and syllabi
-- Exam preparation strategies
-- Recommending learning resources and tools
-- Academic goal setting and tracking
-- Teaching methodologies and instructional design
-Always provide structured, practical, and motivating advice.`,
-
-    events: `You are SmartPlan AI in Event Planning Mode. You are an expert event planner and coordinator. Help users with:
-- Event timelines and schedules
-- Budget planning and cost breakdowns
-- Venue selection criteria
-- Vendor and catering recommendations
-- Guest management and invitations
-- Checklists and to-do lists
-- Risk management and contingency plans
-Always provide detailed, organized, and professional event planning guidance.`
+  const classInfo = {
+    1: { name: 'Class 1', icon: '📘', desc: 'Primary 1 – foundations of literacy, numeracy, and discovery.' },
+    2: { name: 'Class 2', icon: '📗', desc: 'Primary 2 – building reading, writing, and basic maths skills.' },
+    3: { name: 'Class 3', icon: '📙', desc: 'Primary 3 – expanding knowledge in science, maths, and language.' },
+    4: { name: 'Class 4', icon: '📕', desc: 'Primary 4 – introduction to structured learning and critical thinking.' },
+    5: { name: 'Class 5', icon: '📓', desc: 'Primary 5 – deeper subject exploration and project work.' },
+    6: { name: 'Class 6', icon: '📔', desc: 'Primary 6 – exam preparation and final year of primary school.' },
   };
 
-  function setMode(mode, btn) {
-    currentMode = mode;
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    conversationHistory = [];
+  // ── Login ──────────────────────────────────────────────────────────────────
+  function handleLogin() {
+    const nameInput  = document.getElementById('fullNameInput');
+    const classInput = document.getElementById('classSelect');
+    const nameErr    = document.getElementById('nameError');
+    const classErr   = document.getElementById('classError');
 
-    const labels = { general: '💬 General', education: '📚 Education Mode', events: '🎉 Event Planning Mode' };
-    addMessage('ai', `Switched to <strong>${labels[mode]}</strong>. How can I help you today?`);
+    let valid = true;
+    nameErr.style.display  = 'none';
+    classErr.style.display = 'none';
+
+    const name = nameInput.value.trim();
+    // Require at least two words (full name)
+    if (name.split(' ').filter(w => w.length > 0).length < 2) {
+      nameErr.style.display = 'block';
+      valid = false;
+    }
+
+    const cls = classInput.value;
+    if (!cls) {
+      classErr.style.display = 'block';
+      valid = false;
+    }
+
+    if (!valid) return;
+
+    currentUser  = name;
+    currentClass = parseInt(cls);
+
+    document.getElementById('displayName').textContent = currentUser;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display   = 'flex';
+
+    switchClass(currentClass);
   }
 
-  function quickSend(text) {
-    document.getElementById('userInput').value = text;
-    sendMessage();
+  // Allow Enter key on login inputs
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
+      handleLogin();
+    }
+  });
+
+  // ── Petnan Modal ──────────────────────────────────────────────────────────
+  function openPetnan() {
+    document.getElementById('petnanForm').style.display    = 'block';
+    document.getElementById('petnanSuccess').style.display = 'none';
+    document.getElementById('petnanMessage').value         = '';
+    document.getElementById('petnanModal').classList.add('open');
+    setTimeout(() => document.getElementById('petnanMessage').focus(), 100);
   }
 
+  function closePetnan() {
+    document.getElementById('petnanModal').classList.remove('open');
+  }
+
+  function sendToPetnan() {
+    const msg = document.getElementById('petnanMessage').value.trim();
+    if (!msg) {
+      document.getElementById('petnanMessage').focus();
+      return;
+    }
+    // Log the message to the server console so Petnan can see it
+    fetch('/api/petnan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, timestamp: new Date().toLocaleString() })
+    }).catch(() => {}); // best-effort, don't block UI
+
+    document.getElementById('petnanForm').style.display    = 'none';
+    document.getElementById('petnanSuccess').style.display = 'block';
+  }
+
+  // Close modal if clicking outside the box
+  document.getElementById('petnanModal').addEventListener('click', function(e) {
+    if (e.target === this) closePetnan();
+  });
+
+  function logout() {
+    currentUser  = '';
+    currentClass = 1;
+    Object.keys(classHistories).forEach(k => classHistories[k] = []);
+    document.getElementById('fullNameInput').value = '';
+    document.getElementById('classSelect').value   = '';
+    document.getElementById('appScreen').style.display   = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+
+  // ── Class Switching ────────────────────────────────────────────────────────
+  function switchClass(cls) {
+    currentClass = cls;
+    const info = classInfo[cls];
+
+    document.getElementById('chatRoomTitle').textContent = info.icon + '  ' + info.name;
+    document.getElementById('chatRoomDesc').textContent  = info.desc;
+
+    // Highlight sidebar button
+    document.querySelectorAll('.class-btn').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.class) === cls);
+    });
+
+    // Render saved messages for this class
+    renderHistory(cls);
+
+    // Greet if first time entering this class chat
+    if (classHistories[cls].length === 0) {
+      const greeting = `Hi ${currentUser.split(' ')[0]}! 👋 Welcome to the ${info.name} chat.\n\nI'm your AI assistant for Corona School. I'm here to help you with questions about your subjects, homework, or anything school-related. What would you like to know today?`;
+      addMessage('ai', greeting, 'Corona AI');
+    }
+  }
+
+  // ── Rendering ──────────────────────────────────────────────────────────────
+  function renderHistory(cls) {
+    const container = document.getElementById('chatMessages');
+    container.innerHTML = '';
+    classHistories[cls].forEach(m => {
+      _renderMessage(m.role, m.displayText, m.sender);
+    });
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function addMessage(role, text, sender) {
+    classHistories[currentClass].push({ role, displayText: text, sender });
+    _renderMessage(role, text, sender);
+    const container = document.getElementById('chatMessages');
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function _renderMessage(role, text, sender) {
+    const container = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+
+    const initials = sender ? sender.split(' ').map(w=>w[0]).join('').substring(0,2) : '?';
+
+    div.innerHTML = `
+      <div class="avatar ${role}">${role === 'ai' ? '🤖' : initials}</div>
+      <div>
+        <div class="msg-name">${escapeHtml(sender || '')}</div>
+        <div class="bubble">${role === 'ai' ? formatResponse(text) : escapeHtml(text)}</div>
+      </div>
+    `;
+    container.appendChild(div);
+  }
+
+  // ── Typing indicator ───────────────────────────────────────────────────────
+  function showTyping() {
+    const container = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = 'message ai';
+    div.id = 'typingIndicator';
+    div.innerHTML = `
+      <div class="avatar ai">🤖</div>
+      <div>
+        <div class="msg-name">Corona AI</div>
+        <div class="bubble typing-indicator"><span></span><span></span><span></span></div>
+      </div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById('typingIndicator');
+    if (el) el.remove();
+  }
+</script>
+
+<script>
+  // ── Send Message ───────────────────────────────────────────────────────────
+  async function sendMessage() {
+    const input   = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const text    = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    addMessage('user', text, currentUser);
+
+    // Build API history (only content strings)
+    const apiHistory = classHistories[currentClass]
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.displayText }));
+
+    // The last item we just added is the user's message – include it
+    // (it was already pushed by addMessage above, but mapped as role=user)
+
+    showTyping();
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages:    apiHistory,
+          systemPrompt: buildSystemPrompt(),
+          userName:    currentUser,
+          className:   classInfo[currentClass].name
+        })
+      });
+
+      const data = await response.json();
+      removeTyping();
+
+      if (data.error) {
+        addMessage('ai', '⚠️ Error: ' + escapeHtml(data.error), 'Corona AI');
+      } else {
+        const reply = data.reply;
+        // Store as assistant role for future API calls
+        classHistories[currentClass].push({ role: 'assistant', displayText: reply, sender: 'Corona AI' });
+        _renderMessage('ai', reply, 'Corona AI');
+        document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+      }
+    } catch (err) {
+      removeTyping();
+      addMessage('ai', '⚠️ Could not connect to the server. Make sure the server is running on port 3000.', 'Corona AI');
+    }
+
+    sendBtn.disabled = false;
+    document.getElementById('userInput').focus();
+  }
+
+  function buildSystemPrompt() {
+    const cls = classInfo[currentClass];
+    return `You are the AI assistant for Corona School Chat — a school communication platform used by students at Corona School.
+
+The student you are currently helping is: ${currentUser}
+Their class is: ${cls.name} (${cls.desc})
+
+About Corona School Chat:
+- This is a structured school chat platform with separate chat rooms for Class 1 through Class 6.
+- Students use this platform to ask questions, get homework help, and learn.
+- Each class has its own dedicated chat room to keep conversations organised.
+
+Your role:
+- Be a warm, encouraging, and knowledgeable school assistant.
+- Tailor your language and explanations to the appropriate level for ${cls.name} students.
+- Help with subjects like Maths, English, Science, Social Studies, and general school topics.
+- Keep responses clear, structured, and easy to understand.
+- Always address the student by their first name when it feels natural.
+- Encourage curiosity and a love of learning.
+- If asked who you are, say you are the Corona School Chat AI assistant.`;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
   function handleKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -316,93 +900,17 @@ Always provide detailed, organized, and professional event planning guidance.`
     el.style.height = Math.min(el.scrollHeight, 100) + 'px';
   }
 
-  function addMessage(role, text) {
-    const container = document.getElementById('chatMessages');
-    const div = document.createElement('div');
-    div.className = `message ${role}`;
-    div.innerHTML = `
-      <div class="avatar ${role}">${role === 'ai' ? '🤖' : '👤'}</div>
-      <div class="bubble">${text}</div>
-    `;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-    return div;
-  }
-
-  function showTyping() {
-    const container = document.getElementById('chatMessages');
-    const div = document.createElement('div');
-    div.className = 'message ai';
-    div.id = 'typingIndicator';
-    div.innerHTML = `
-      <div class="avatar ai">🤖</div>
-      <div class="bubble typing-indicator"><span></span><span></span><span></span></div>
-    `;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-  }
-
-  function removeTyping() {
-    const el = document.getElementById('typingIndicator');
-    if (el) el.remove();
-  }
-
-  async function sendMessage() {
-    const input = document.getElementById('userInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const text = input.value.trim();
-    if (!text) return;
-
-    input.value = '';
-    input.style.height = 'auto';
-    sendBtn.disabled = true;
-
-    addMessage('user', escapeHtml(text));
-    conversationHistory.push({ role: 'user', content: text });
-
-    showTyping();
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: conversationHistory,
-          systemPrompt: systemPrompts[currentMode]
-        })
-      });
-
-      const data = await response.json();
-      removeTyping();
-
-      if (data.error) {
-        addMessage('ai', `⚠️ Error: ${escapeHtml(data.error)}`);
-      } else {
-        const reply = data.reply;
-        conversationHistory.push({ role: 'assistant', content: reply });
-        addMessage('ai', formatResponse(reply));
-      }
-    } catch (err) {
-      removeTyping();
-      addMessage('ai', '⚠️ Could not connect to the server. Make sure the server is running on port 3000.');
-    }
-
-    sendBtn.disabled = false;
-    input.focus();
-  }
-
   function escapeHtml(text) {
-    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(text)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;');
   }
 
   function formatResponse(text) {
-    // Bold **text**
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    // Italic *text*
     text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    // Code `text`
     text = text.replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;">$1</code>');
-    // Line breaks
     text = text.replace(/\n/g, '<br>');
     return text;
   }

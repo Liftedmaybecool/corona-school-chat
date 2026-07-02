@@ -1,18 +1,18 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const Groq = require('groq-sdk');
-const path = require('path');
+const cors    = require('cors');
+const Groq    = require('groq-sdk');
+const path    = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Initialize Groq – paste your API key in .env as GROQ_API_KEY=gsk_...
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+// Serve static files from root directory (index.html lives here)
+app.use(express.static(path.join(__dirname)));
+
+// Initialize Groq
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ── Chat endpoint ──────────────────────────────────────────────────────────────
 app.post('/api/chat', async (req, res) => {
@@ -24,14 +24,14 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      messages: [
+      model:       'llama-3.1-8b-instant',
+      messages:    [
         { role: 'system', content: systemPrompt },
         ...messages,
       ],
-      max_tokens: 1500,
+      max_tokens:  1500,
       temperature: 0.7,
-      stream: false,
+      stream:      false,
     });
 
     const reply = completion.choices[0].message.content;
@@ -51,18 +51,26 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// ── Petnan messages ────────────────────────────────────────────────────────────
+app.post('/api/petnan', (req, res) => {
+  const { message, timestamp } = req.body;
+  console.log(`\n📩 [Message for Petnan] ${timestamp}`);
+  console.log(`   "${message}"\n`);
+  res.json({ ok: true });
+});
+
 // ── Health check ───────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'StudyBuddy AI server is running.' });
+  res.json({ status: 'ok', message: 'Corona School Chat server is running.' });
 });
 
 // ── Serve frontend ─────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`\n🚀 StudyBuddy AI running at http://localhost:${PORT}`);
-  console.log(`📌 Add your Groq API key to .env file: GROQ_API_KEY=gsk_...`);
+  console.log(`\n🏫 Corona School Chat running at http://localhost:${PORT}`);
+  console.log(`📌 Groq API key needed in .env: GROQ_API_KEY=gsk_...`);
 });

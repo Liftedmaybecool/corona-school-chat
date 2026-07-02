@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Corona School Chat</title>
+  <script src="/socket.io/socket.io.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -18,7 +19,7 @@
       color: #fff;
     }
 
-    /* ── LOGIN SCREEN ── */
+    /* ── LOGIN ── */
     #loginScreen {
       display: flex;
       flex-direction: column;
@@ -29,17 +30,16 @@
     }
 
     .login-logo {
-      font-size: 2.8rem;
+      font-size: 2.6rem;
       font-weight: 800;
       color: #4da6ff;
-      letter-spacing: 1px;
       margin-bottom: 4px;
     }
 
     .login-sub {
       color: #8ab4d4;
-      font-size: 1rem;
-      margin-bottom: 36px;
+      font-size: 0.95rem;
+      margin-bottom: 32px;
       letter-spacing: 2px;
       text-transform: uppercase;
     }
@@ -48,28 +48,21 @@
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 20px;
-      padding: 36px 40px;
+      padding: 34px 38px;
       width: 100%;
-      max-width: 440px;
+      max-width: 420px;
       backdrop-filter: blur(14px);
     }
 
-    .login-card h2 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      margin-bottom: 24px;
-      color: #fff;
-    }
+    .login-card h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 22px; }
 
-    .form-group {
-      margin-bottom: 18px;
-    }
+    .form-group { margin-bottom: 16px; }
 
     .form-group label {
       display: block;
-      font-size: 0.88rem;
+      font-size: 0.85rem;
       color: #8ab4d4;
-      margin-bottom: 7px;
+      margin-bottom: 6px;
     }
 
     .form-group input,
@@ -79,24 +72,19 @@
       border: 1px solid rgba(255,255,255,0.15);
       border-radius: 10px;
       color: #fff;
-      padding: 12px 14px;
-      font-size: 0.95rem;
+      padding: 11px 13px;
+      font-size: 0.93rem;
       outline: none;
       font-family: inherit;
       transition: border 0.2s;
     }
 
     .form-group input::placeholder { color: #4a6a84; }
-
     .form-group input:focus,
-    .form-group select:focus {
-      border-color: #4da6ff;
-    }
+    .form-group select:focus { border-color: #4da6ff; }
+    .form-group select option { background: #1b2a3b; color: #fff; }
 
-    .form-group select option {
-      background: #1b2a3b;
-      color: #fff;
-    }
+    .error-msg { color: #ff6b6b; font-size: 0.8rem; margin-top: 5px; display: none; }
 
     .login-btn {
       width: 100%;
@@ -109,24 +97,9 @@
       font-weight: 700;
       cursor: pointer;
       transition: opacity 0.2s;
-      margin-top: 6px;
+      margin-top: 4px;
     }
-
     .login-btn:hover { opacity: 0.88; }
-
-    .login-footer {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 0.78rem;
-      color: #4a6a84;
-    }
-
-    .error-msg {
-      color: #ff6b6b;
-      font-size: 0.83rem;
-      margin-top: 6px;
-      display: none;
-    }
 
     .petnan-btn {
       width: 100%;
@@ -135,390 +108,211 @@
       border-radius: 12px;
       color: #4da6ff;
       padding: 11px;
-      font-size: 0.93rem;
+      font-size: 0.9rem;
       font-family: inherit;
       cursor: pointer;
       transition: all 0.2s;
       margin-top: 10px;
     }
+    .petnan-btn:hover { background: rgba(77,166,255,0.1); border-color: #4da6ff; }
 
-    .petnan-btn:hover {
-      background: rgba(77,166,255,0.1);
-      border-color: #4da6ff;
-    }
+    .login-footer { text-align: center; margin-top: 18px; font-size: 0.75rem; color: #4a6a84; }
 
     /* ── PETNAN MODAL ── */
     .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(4px);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      z-index: 200; align-items: center; justify-content: center;
     }
-
     .modal-overlay.open { display: flex; }
-
     .modal-box {
-      background: #1b2a3b;
-      border: 1px solid rgba(77,166,255,0.25);
-      border-radius: 18px;
-      padding: 30px 32px;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      background: #1b2a3b; border: 1px solid rgba(77,166,255,0.25);
+      border-radius: 18px; padding: 28px 30px; width: 100%; max-width: 400px;
     }
-
-    .modal-box h3 {
-      font-size: 1.1rem;
-      color: #fff;
-      margin-bottom: 6px;
-    }
-
-    .modal-box p {
-      font-size: 0.82rem;
-      color: #4a6a84;
-      margin-bottom: 18px;
-    }
-
+    .modal-box h3 { font-size: 1.05rem; margin-bottom: 5px; }
+    .modal-box p  { font-size: 0.8rem; color: #4a6a84; margin-bottom: 14px; }
     .modal-box textarea {
-      width: 100%;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.13);
-      border-radius: 10px;
-      color: #fff;
-      padding: 11px 13px;
-      font-size: 0.92rem;
-      font-family: inherit;
-      resize: none;
-      outline: none;
-      min-height: 90px;
-      transition: border 0.2s;
+      width: 100%; background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.13); border-radius: 10px;
+      color: #fff; padding: 10px 12px; font-size: 0.9rem;
+      font-family: inherit; resize: none; outline: none; min-height: 80px;
     }
-
     .modal-box textarea:focus { border-color: #4da6ff; }
     .modal-box textarea::placeholder { color: #4a6a84; }
-
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 14px;
-    }
-
+    .modal-actions { display: flex; gap: 10px; margin-top: 12px; }
     .modal-send-btn {
-      flex: 1;
-      background: linear-gradient(135deg, #1a6fc4, #4da6ff);
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      padding: 11px;
-      font-size: 0.93rem;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: opacity 0.2s;
+      flex: 1; background: linear-gradient(135deg, #1a6fc4, #4da6ff);
+      border: none; border-radius: 10px; color: #fff; padding: 10px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit;
     }
-
-    .modal-send-btn:hover { opacity: 0.85; }
-
     .modal-cancel-btn {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 10px;
-      color: #8ab4d4;
-      padding: 11px 18px;
-      font-size: 0.93rem;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.2s;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; color: #8ab4d4; padding: 10px 16px;
+      font-size: 0.9rem; cursor: pointer; font-family: inherit;
     }
+    .modal-success { display: none; text-align: center; padding: 8px 0; }
+    .modal-success p { color: #4da6ff; font-size: 0.92rem; margin-top: 8px; }
 
-    .modal-cancel-btn:hover { background: rgba(255,100,100,0.1); color: #ff9999; }
-
-    .modal-success {
-      display: none;
-      text-align: center;
-      padding: 10px 0 4px;
-    }
-
-    .modal-success p { color: #4da6ff; font-size: 0.95rem; margin-top: 8px; }
-
-    /* ── MAIN APP ── */
+    /* ── APP SHELL ── */
     #appScreen {
-      display: none;
-      flex-direction: column;
-      width: 100%;
-      min-height: 100vh;
+      display: none; flex-direction: column;
+      width: 100%; min-height: 100vh;
     }
 
-    /* ── TOP BAR ── */
     .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 24px;
-      background: rgba(0,0,0,0.3);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 22px;
+      background: rgba(0,0,0,0.35);
       border-bottom: 1px solid rgba(255,255,255,0.08);
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      position: sticky; top: 0; z-index: 100;
     }
-
-    .topbar-logo {
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: #4da6ff;
-    }
-
-    .topbar-user {
-      font-size: 0.88rem;
-      color: #8ab4d4;
-    }
-
-    .topbar-user span {
-      color: #fff;
-      font-weight: 600;
-    }
-
+    .topbar-logo { font-size: 1.2rem; font-weight: 800; color: #4da6ff; }
+    .topbar-user { font-size: 0.85rem; color: #8ab4d4; }
+    .topbar-user span { color: #fff; font-weight: 600; }
     .logout-btn {
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 8px;
-      color: #8ab4d4;
-      padding: 5px 14px;
-      font-size: 0.82rem;
-      cursor: pointer;
-      transition: all 0.2s;
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 8px; color: #8ab4d4; padding: 5px 13px;
+      font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
     }
+    .logout-btn:hover { background: rgba(255,80,80,0.15); color: #ff9999; }
 
-    .logout-btn:hover { background: rgba(255,100,100,0.2); color: #ff9999; }
-
-    /* ── LAYOUT ── */
-    .app-layout {
-      display: flex;
-      flex: 1;
-      height: calc(100vh - 58px);
-    }
+    .app-layout { display: flex; flex: 1; height: calc(100vh - 52px); }
 
     /* ── SIDEBAR ── */
     .sidebar {
-      width: 220px;
-      background: rgba(0,0,0,0.25);
+      width: 200px; background: rgba(0,0,0,0.25);
       border-right: 1px solid rgba(255,255,255,0.08);
-      display: flex;
-      flex-direction: column;
-      padding: 16px 0;
-      flex-shrink: 0;
+      display: flex; flex-direction: column; padding: 14px 0; flex-shrink: 0;
     }
-
     .sidebar-title {
-      font-size: 0.72rem;
-      color: #4a6a84;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      padding: 0 18px 10px;
+      font-size: 0.7rem; color: #4a6a84; text-transform: uppercase;
+      letter-spacing: 1.5px; padding: 0 16px 10px;
     }
-
     .class-btn {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 11px 18px;
-      cursor: pointer;
-      border: none;
-      background: transparent;
-      color: #8ab4d4;
-      font-size: 0.93rem;
-      font-family: inherit;
-      text-align: left;
-      transition: all 0.18s;
-      border-left: 3px solid transparent;
-      width: 100%;
+      display: flex; align-items: center; gap: 9px;
+      padding: 10px 16px; cursor: pointer; border: none;
+      background: transparent; color: #8ab4d4; font-size: 0.9rem;
+      font-family: inherit; text-align: left; transition: all 0.18s;
+      border-left: 3px solid transparent; width: 100%;
     }
-
-    .class-btn:hover {
-      background: rgba(77,166,255,0.1);
-      color: #fff;
-    }
-
+    .class-btn:hover { background: rgba(77,166,255,0.1); color: #fff; }
     .class-btn.active {
-      background: rgba(77,166,255,0.15);
-      color: #4da6ff;
-      border-left-color: #4da6ff;
-      font-weight: 600;
+      background: rgba(77,166,255,0.15); color: #4da6ff;
+      border-left-color: #4da6ff; font-weight: 600;
     }
 
-    .class-icon {
-      font-size: 1.1rem;
+    /* ── ONLINE USERS ── */
+    .online-section {
+      margin-top: auto; padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.07);
     }
+    .online-title { font-size: 0.68rem; color: #4a6a84; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .online-list { display: flex; flex-direction: column; gap: 5px; }
+    .online-user {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 0.8rem; color: #8ab4d4;
+    }
+    .online-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
 
     /* ── CHAT AREA ── */
-    .chat-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
+    .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
     .chat-header {
-      padding: 14px 22px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.07);
       background: rgba(0,0,0,0.15);
     }
-
-    .chat-header h2 {
-      font-size: 1.1rem;
-      color: #fff;
-    }
-
-    .chat-header p {
-      font-size: 0.78rem;
-      color: #4a6a84;
-      margin-top: 2px;
-    }
+    .chat-header h2 { font-size: 1.05rem; color: #fff; }
+    .chat-header p  { font-size: 0.75rem; color: #4a6a84; margin-top: 2px; }
 
     .chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      scroll-behavior: smooth;
+      flex: 1; overflow-y: auto; padding: 18px 20px;
+      display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth;
     }
-
-    .chat-messages::-webkit-scrollbar { width: 5px; }
+    .chat-messages::-webkit-scrollbar { width: 4px; }
     .chat-messages::-webkit-scrollbar-thumb { background: #4da6ff33; border-radius: 10px; }
 
-    .message {
-      display: flex;
-      gap: 10px;
-      align-items: flex-start;
-      animation: fadeIn 0.3s ease;
-    }
+    /* ── MESSAGES ── */
+    .message { display: flex; gap: 9px; align-items: flex-start; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .message.user { flex-direction: row-reverse; }
+    .message.own { flex-direction: row-reverse; }
 
     .avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-      flex-shrink: 0;
-      font-weight: 700;
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 700; flex-shrink: 0;
       text-transform: uppercase;
     }
+    .avatar.ai      { background: linear-gradient(135deg, #1a6fc4, #4da6ff); font-size: 1rem; }
+    .avatar.student { background: linear-gradient(135deg, #1a5c8a, #2d7db3); }
+    .avatar.own-av  { background: linear-gradient(135deg, #0d4a8a, #1a6fc4); }
 
-    .avatar.ai   { background: linear-gradient(135deg, #1a6fc4, #4da6ff); }
-    .avatar.user { background: linear-gradient(135deg, #0d4a8a, #1a6fc4); }
+    .msg-wrap { display: flex; flex-direction: column; max-width: 70%; }
+    .message.own .msg-wrap { align-items: flex-end; }
+
+    .msg-meta { font-size: 0.7rem; color: #4a6a84; margin-bottom: 3px; }
+    .message.own .msg-meta { text-align: right; }
 
     .bubble {
-      max-width: 72%;
-      padding: 11px 15px;
-      border-radius: 14px;
-      font-size: 0.92rem;
-      line-height: 1.6;
-      white-space: pre-wrap;
+      padding: 10px 14px; border-radius: 14px;
+      font-size: 0.9rem; line-height: 1.55; white-space: pre-wrap;
+    }
+    .bubble.ai-bubble {
+      background: rgba(77,166,255,0.12); border: 1px solid rgba(77,166,255,0.28);
+    }
+    .bubble.student-bubble {
+      background: rgba(45,125,179,0.18); border: 1px solid rgba(45,125,179,0.3);
+    }
+    .bubble.own-bubble {
+      background: rgba(77,166,255,0.22); border: 1px solid rgba(77,166,255,0.35);
+    }
+    .bubble.system-bubble {
+      background: transparent; border: none;
+      font-size: 0.78rem; color: #4a6a84; font-style: italic; text-align: center;
     }
 
-    .message.ai   .bubble {
-      background: rgba(77,166,255,0.1);
-      border: 1px solid rgba(77,166,255,0.25);
-    }
+    .message.system { justify-content: center; }
 
-    .message.user .bubble {
-      background: rgba(77,166,255,0.18);
-      border: 1px solid rgba(77,166,255,0.3);
-      text-align: right;
-    }
-
-    .msg-name {
-      font-size: 0.72rem;
-      color: #4a6a84;
-      margin-bottom: 3px;
-    }
-
-    .message.user .msg-name { text-align: right; }
-
-    .typing-indicator span {
-      display: inline-block;
-      width: 7px; height: 7px;
-      background: #4da6ff;
-      border-radius: 50%;
-      margin: 0 2px;
-      animation: bounce 1.2s infinite;
-    }
-    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-
-    @keyframes bounce {
-      0%, 80%, 100% { transform: translateY(0); }
-      40%           { transform: translateY(-7px); }
+    /* ── AI HINT ── */
+    .ai-hint {
+      font-size: 0.72rem; color: #4a6a84; padding: 6px 20px 0;
+      display: flex; align-items: center; gap: 5px;
     }
 
     /* ── INPUT ── */
     .chat-input-area {
-      display: flex;
-      gap: 10px;
-      padding: 14px 18px;
-      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex; gap: 9px; padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.07);
       background: rgba(0,0,0,0.2);
     }
-
     .chat-input-area textarea {
-      flex: 1;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.13);
-      border-radius: 12px;
-      color: #fff;
-      padding: 10px 14px;
-      font-size: 0.92rem;
-      resize: none;
-      outline: none;
-      font-family: inherit;
-      max-height: 100px;
+      flex: 1; background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+      color: #fff; padding: 9px 13px; font-size: 0.9rem;
+      resize: none; outline: none; font-family: inherit; max-height: 100px;
       transition: border 0.2s;
     }
-
     .chat-input-area textarea:focus { border-color: #4da6ff; }
     .chat-input-area textarea::placeholder { color: #4a6a84; }
-
     .send-btn {
       background: linear-gradient(135deg, #1a6fc4, #4da6ff);
-      border: none;
-      border-radius: 12px;
-      color: #fff;
-      padding: 10px 18px;
-      cursor: pointer;
-      font-size: 1.2rem;
-      transition: opacity 0.2s;
+      border: none; border-radius: 12px; color: #fff;
+      padding: 9px 16px; cursor: pointer; font-size: 1.1rem; transition: opacity 0.2s;
     }
-
     .send-btn:hover { opacity: 0.85; }
     .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
     @media (max-width: 600px) {
-      .sidebar { width: 60px; }
-      .sidebar-title, .class-btn span.class-label { display: none; }
-      .login-card { padding: 28px 20px; }
+      .sidebar { width: 52px; }
+      .sidebar-title, .class-btn .class-label, .online-section { display: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- ══════════════ LOGIN SCREEN ══════════════ -->
+<!-- ══════════════ LOGIN ══════════════ -->
 <div id="loginScreen">
-  <div class="login-logo">Corona School Chat</div>
+  <div class="login-logo">🏫 Corona School Chat</div>
   <div class="login-sub">School Communication Platform</div>
 
   <div class="login-card">
@@ -526,7 +320,7 @@
 
     <div class="form-group">
       <label for="fullNameInput">Your Full Name</label>
-      <input type="text" id="fullNameInput" placeholder="e.g. John Adebayo" autocomplete="off" />
+      <input type="text" id="fullNameInput" placeholder="e.g. John Adebayo" autocomplete="off"/>
       <div class="error-msg" id="nameError">Please enter your full name (first and last name).</div>
     </div>
 
@@ -545,7 +339,6 @@
     </div>
 
     <button class="login-btn" onclick="handleLogin()">Enter Chat</button>
-
     <button class="petnan-btn" onclick="openPetnan()">💬 Ask Petnan for Something</button>
 
     <div class="login-footer">Corona School Chat &bull; Powered by AI</div>
@@ -557,24 +350,23 @@
   <div class="modal-box">
     <div id="petnanForm">
       <h3>💬 Ask Petnan for Something</h3>
-      <p>Type your message or request below and Petnan will see it.</p>
-      <textarea id="petnanMessage" placeholder="e.g. I need help with my password, or I have a question about class..." rows="4"></textarea>
+      <p>Type your message and Petnan will see it.</p>
+      <textarea id="petnanMessage" placeholder="Write your message here..."></textarea>
       <div class="modal-actions">
         <button class="modal-send-btn" onclick="sendToPetnan()">Send Message</button>
         <button class="modal-cancel-btn" onclick="closePetnan()">Cancel</button>
       </div>
     </div>
     <div class="modal-success" id="petnanSuccess">
-      <div style="font-size:2.5rem">✅</div>
+      <div style="font-size:2.2rem">✅</div>
       <p>Your message has been sent to Petnan!</p>
-      <button class="modal-cancel-btn" style="margin-top:14px;width:100%" onclick="closePetnan()">Close</button>
+      <button class="modal-cancel-btn" style="margin-top:12px;width:100%" onclick="closePetnan()">Close</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════════ MAIN APP ══════════════ -->
+<!-- ══════════════ APP ══════════════ -->
 <div id="appScreen">
-  <!-- Top Bar -->
   <div class="topbar">
     <div class="topbar-logo">🏫 Corona School Chat</div>
     <div class="topbar-user">Signed in as <span id="displayName"></span></div>
@@ -585,37 +377,31 @@
     <!-- Sidebar -->
     <div class="sidebar">
       <div class="sidebar-title">Classes</div>
-      <button class="class-btn" data-class="1" onclick="switchClass(1)">
-        <span class="class-icon">📘</span><span class="class-label">Class 1</span>
-      </button>
-      <button class="class-btn" data-class="2" onclick="switchClass(2)">
-        <span class="class-icon">📗</span><span class="class-label">Class 2</span>
-      </button>
-      <button class="class-btn" data-class="3" onclick="switchClass(3)">
-        <span class="class-icon">📙</span><span class="class-label">Class 3</span>
-      </button>
-      <button class="class-btn" data-class="4" onclick="switchClass(4)">
-        <span class="class-icon">📕</span><span class="class-label">Class 4</span>
-      </button>
-      <button class="class-btn" data-class="5" onclick="switchClass(5)">
-        <span class="class-icon">📓</span><span class="class-label">Class 5</span>
-      </button>
-      <button class="class-btn" data-class="6" onclick="switchClass(6)">
-        <span class="class-icon">📔</span><span class="class-label">Class 6</span>
-      </button>
+      <button class="class-btn" data-class="1" onclick="switchClass(1)"><span>📘</span><span class="class-label">Class 1</span></button>
+      <button class="class-btn" data-class="2" onclick="switchClass(2)"><span>📗</span><span class="class-label">Class 2</span></button>
+      <button class="class-btn" data-class="3" onclick="switchClass(3)"><span>📙</span><span class="class-label">Class 3</span></button>
+      <button class="class-btn" data-class="4" onclick="switchClass(4)"><span>📕</span><span class="class-label">Class 4</span></button>
+      <button class="class-btn" data-class="5" onclick="switchClass(5)"><span>📓</span><span class="class-label">Class 5</span></button>
+      <button class="class-btn" data-class="6" onclick="switchClass(6)"><span>📔</span><span class="class-label">Class 6</span></button>
+
+      <div class="online-section">
+        <div class="online-title">Online Now</div>
+        <div class="online-list" id="onlineList">
+          <div class="online-user" style="color:#4a6a84;font-size:0.75rem">No one yet</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Chat Area -->
+    <!-- Chat -->
     <div class="chat-area">
       <div class="chat-header">
-        <h2 id="chatRoomTitle">Class Chat</h2>
-        <p id="chatRoomDesc">Ask questions, get help from the AI assistant, and discuss with your class.</p>
+        <h2 id="chatRoomTitle">Select a class</h2>
+        <p id="chatRoomDesc">Choose a class from the sidebar to start chatting.</p>
       </div>
-
       <div class="chat-messages" id="chatMessages"></div>
-
+      <div class="ai-hint">💡 Tip: Type <strong style="color:#4da6ff">@AI</strong> at the start of your message to ask the AI assistant — everyone in the class will see the answer.</div>
       <div class="chat-input-area">
-        <textarea id="userInput" placeholder="Type your message..." rows="1"
+        <textarea id="userInput" placeholder="Type a message... or @AI to ask the AI" rows="1"
           onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
       </div>
@@ -626,19 +412,48 @@
 <script>
   // ── State ──────────────────────────────────────────────────────────────────
   let currentUser  = '';
-  let currentClass = 1;
-
-  // Per-class chat histories (so switching class keeps its own conversation)
-  const classHistories = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+  let currentClass = null;
+  const socket     = io();
 
   const classInfo = {
-    1: { name: 'Class 1', icon: '📘', desc: 'Primary 1 – foundations of literacy, numeracy, and discovery.' },
-    2: { name: 'Class 2', icon: '📗', desc: 'Primary 2 – building reading, writing, and basic maths skills.' },
-    3: { name: 'Class 3', icon: '📙', desc: 'Primary 3 – expanding knowledge in science, maths, and language.' },
-    4: { name: 'Class 4', icon: '📕', desc: 'Primary 4 – introduction to structured learning and critical thinking.' },
-    5: { name: 'Class 5', icon: '📓', desc: 'Primary 5 – deeper subject exploration and project work.' },
-    6: { name: 'Class 6', icon: '📔', desc: 'Primary 6 – exam preparation and final year of primary school.' },
+    1: { name: 'Class 1', icon: '📘', desc: 'Primary 1 chat room' },
+    2: { name: 'Class 2', icon: '📗', desc: 'Primary 2 chat room' },
+    3: { name: 'Class 3', icon: '📙', desc: 'Primary 3 chat room' },
+    4: { name: 'Class 4', icon: '📕', desc: 'Primary 4 chat room' },
+    5: { name: 'Class 5', icon: '📓', desc: 'Primary 5 chat room' },
+    6: { name: 'Class 6', icon: '📔', desc: 'Primary 6 chat room' },
   };
+
+  // ── Socket events ──────────────────────────────────────────────────────────
+  // Server sends full history when joining a room
+  socket.on('history', (messages) => {
+    const container = document.getElementById('chatMessages');
+    container.innerHTML = '';
+    messages.forEach(m => renderMessage(m));
+    container.scrollTop = container.scrollHeight;
+  });
+
+  // New message from any student or AI
+  socket.on('message', (msg) => {
+    renderMessage(msg);
+    const container = document.getElementById('chatMessages');
+    container.scrollTop = container.scrollHeight;
+
+    // Remove typing indicator if AI replied
+    if (msg.type === 'ai') removeTyping();
+  });
+
+  // Online users list update
+  socket.on('onlineUsers', (users) => {
+    const list = document.getElementById('onlineList');
+    if (!users || users.length === 0) {
+      list.innerHTML = '<div class="online-user" style="color:#4a6a84;font-size:0.75rem">No one yet</div>';
+      return;
+    }
+    list.innerHTML = users.map(u =>
+      `<div class="online-user"><div class="online-dot"></div>${escapeHtml(u)}</div>`
+    ).join('');
+  });
 
   // ── Login ──────────────────────────────────────────────────────────────────
   function handleLogin() {
@@ -646,84 +461,40 @@
     const classInput = document.getElementById('classSelect');
     const nameErr    = document.getElementById('nameError');
     const classErr   = document.getElementById('classError');
-
     let valid = true;
     nameErr.style.display  = 'none';
     classErr.style.display = 'none';
 
     const name = nameInput.value.trim();
-    // Require at least two words (full name)
     if (name.split(' ').filter(w => w.length > 0).length < 2) {
-      nameErr.style.display = 'block';
-      valid = false;
+      nameErr.style.display = 'block'; valid = false;
     }
-
     const cls = classInput.value;
-    if (!cls) {
-      classErr.style.display = 'block';
-      valid = false;
-    }
-
+    if (!cls) { classErr.style.display = 'block'; valid = false; }
     if (!valid) return;
 
     currentUser  = name;
     currentClass = parseInt(cls);
 
-    document.getElementById('displayName').textContent = currentUser;
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('appScreen').style.display   = 'flex';
+    document.getElementById('displayName').textContent    = currentUser;
+    document.getElementById('loginScreen').style.display  = 'none';
+    document.getElementById('appScreen').style.display    = 'flex';
 
     switchClass(currentClass);
   }
 
-  // Allow Enter key on login inputs
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
       handleLogin();
     }
   });
 
-  // ── Petnan Modal ──────────────────────────────────────────────────────────
-  function openPetnan() {
-    document.getElementById('petnanForm').style.display    = 'block';
-    document.getElementById('petnanSuccess').style.display = 'none';
-    document.getElementById('petnanMessage').value         = '';
-    document.getElementById('petnanModal').classList.add('open');
-    setTimeout(() => document.getElementById('petnanMessage').focus(), 100);
-  }
-
-  function closePetnan() {
-    document.getElementById('petnanModal').classList.remove('open');
-  }
-
-  function sendToPetnan() {
-    const msg = document.getElementById('petnanMessage').value.trim();
-    if (!msg) {
-      document.getElementById('petnanMessage').focus();
-      return;
-    }
-    // Log the message to the server console so Petnan can see it
-    fetch('/api/petnan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, timestamp: new Date().toLocaleString() })
-    }).catch(() => {}); // best-effort, don't block UI
-
-    document.getElementById('petnanForm').style.display    = 'none';
-    document.getElementById('petnanSuccess').style.display = 'block';
-  }
-
-  // Close modal if clicking outside the box
-  document.getElementById('petnanModal').addEventListener('click', function(e) {
-    if (e.target === this) closePetnan();
-  });
-
   function logout() {
-    currentUser  = '';
-    currentClass = 1;
-    Object.keys(classHistories).forEach(k => classHistories[k] = []);
+    socket.emit('leaveClass');
+    currentUser = ''; currentClass = null;
     document.getElementById('fullNameInput').value = '';
     document.getElementById('classSelect').value   = '';
+    document.getElementById('chatMessages').innerHTML = '';
     document.getElementById('appScreen').style.display   = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
   }
@@ -735,67 +506,69 @@
 
     document.getElementById('chatRoomTitle').textContent = info.icon + '  ' + info.name;
     document.getElementById('chatRoomDesc').textContent  = info.desc;
+    document.getElementById('chatMessages').innerHTML    = '';
 
-    // Highlight sidebar button
     document.querySelectorAll('.class-btn').forEach(btn => {
       btn.classList.toggle('active', parseInt(btn.dataset.class) === cls);
     });
 
-    // Render saved messages for this class
-    renderHistory(cls);
-
-    // Greet if first time entering this class chat
-    if (classHistories[cls].length === 0) {
-      const greeting = `Hi ${currentUser.split(' ')[0]}! 👋 Welcome to the ${info.name} chat.\n\nI'm your AI assistant for Corona School. I'm here to help you with questions about your subjects, homework, or anything school-related. What would you like to know today?`;
-      addMessage('ai', greeting, 'Corona AI');
-    }
+    // Tell server to join this class room
+    socket.emit('joinClass', { name: currentUser, classNum: cls });
+    document.getElementById('userInput').focus();
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────────
-  function renderHistory(cls) {
+  function renderMessage(msg) {
     const container = document.getElementById('chatMessages');
-    container.innerHTML = '';
-    classHistories[cls].forEach(m => {
-      _renderMessage(m.role, m.displayText, m.sender);
-    });
-    container.scrollTop = container.scrollHeight;
-  }
 
-  function addMessage(role, text, sender) {
-    classHistories[currentClass].push({ role, displayText: text, sender });
-    _renderMessage(role, text, sender);
-    const container = document.getElementById('chatMessages');
-    container.scrollTop = container.scrollHeight;
-  }
+    if (msg.type === 'system') {
+      const div = document.createElement('div');
+      div.className = 'message system';
+      div.innerHTML = `<div class="bubble system-bubble">${escapeHtml(msg.text)}</div>`;
+      container.appendChild(div);
+      return;
+    }
 
-  function _renderMessage(role, text, sender) {
-    const container = document.getElementById('chatMessages');
+    const isOwn = msg.sender === currentUser;
+    const isAI  = msg.type === 'ai';
+
     const div = document.createElement('div');
-    div.className = `message ${role}`;
+    div.className = `message ${isOwn ? 'own' : ''}`;
 
-    const initials = sender ? sender.split(' ').map(w=>w[0]).join('').substring(0,2) : '?';
+    const initials = msg.sender.split(' ').map(w => w[0]).join('').substring(0, 2);
+    const avatarClass = isAI ? 'ai' : (isOwn ? 'own-av' : 'student');
+    const avatarContent = isAI ? '🤖' : initials;
+    const bubbleClass = isAI ? 'ai-bubble' : (isOwn ? 'own-bubble' : 'student-bubble');
+
+    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const replyNote = msg.replyTo ? ` <span style="color:#4da6ff">→ ${escapeHtml(msg.replyTo)}</span>` : '';
 
     div.innerHTML = `
-      <div class="avatar ${role}">${role === 'ai' ? '🤖' : initials}</div>
-      <div>
-        <div class="msg-name">${escapeHtml(sender || '')}</div>
-        <div class="bubble">${role === 'ai' ? formatResponse(text) : escapeHtml(text)}</div>
+      <div class="avatar ${avatarClass}">${avatarContent}</div>
+      <div class="msg-wrap">
+        <div class="msg-meta">${escapeHtml(msg.sender)}${replyNote} &bull; ${time}</div>
+        <div class="bubble ${bubbleClass}">${isAI ? formatResponse(msg.text) : escapeHtml(msg.text)}</div>
       </div>
     `;
     container.appendChild(div);
   }
 
-  // ── Typing indicator ───────────────────────────────────────────────────────
   function showTyping() {
     const container = document.getElementById('chatMessages');
+    if (document.getElementById('typingIndicator')) return;
     const div = document.createElement('div');
-    div.className = 'message ai';
-    div.id = 'typingIndicator';
+    div.className = 'message'; div.id = 'typingIndicator';
     div.innerHTML = `
       <div class="avatar ai">🤖</div>
-      <div>
-        <div class="msg-name">Corona AI</div>
-        <div class="bubble typing-indicator"><span></span><span></span><span></span></div>
+      <div class="msg-wrap">
+        <div class="msg-meta">Corona AI</div>
+        <div class="bubble ai-bubble" style="padding:10px 16px">
+          <span style="display:inline-flex;gap:4px;align-items:center">
+            <span style="width:7px;height:7px;border-radius:50%;background:#4da6ff;animation:bounce 1.2s infinite;display:inline-block"></span>
+            <span style="width:7px;height:7px;border-radius:50%;background:#4da6ff;animation:bounce 1.2s .2s infinite;display:inline-block"></span>
+            <span style="width:7px;height:7px;border-radius:50%;background:#4da6ff;animation:bounce 1.2s .4s infinite;display:inline-block"></span>
+          </span>
+        </div>
       </div>
     `;
     container.appendChild(div);
@@ -806,93 +579,29 @@
     const el = document.getElementById('typingIndicator');
     if (el) el.remove();
   }
-</script>
 
-<script>
   // ── Send Message ───────────────────────────────────────────────────────────
-  async function sendMessage() {
+  function sendMessage() {
     const input   = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
     const text    = input.value.trim();
-    if (!text) return;
+    if (!text || !currentClass) return;
 
-    input.value = '';
-    input.style.height = 'auto';
-    sendBtn.disabled = true;
+    input.value = ''; input.style.height = 'auto';
 
-    addMessage('user', text, currentUser);
-
-    // Build API history (only content strings)
-    const apiHistory = classHistories[currentClass]
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.displayText }));
-
-    // The last item we just added is the user's message – include it
-    // (it was already pushed by addMessage above, but mapped as role=user)
-
-    showTyping();
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages:    apiHistory,
-          systemPrompt: buildSystemPrompt(),
-          userName:    currentUser,
-          className:   classInfo[currentClass].name
-        })
-      });
-
-      const data = await response.json();
-      removeTyping();
-
-      if (data.error) {
-        addMessage('ai', '⚠️ Error: ' + escapeHtml(data.error), 'Corona AI');
-      } else {
-        const reply = data.reply;
-        // Store as assistant role for future API calls
-        classHistories[currentClass].push({ role: 'assistant', displayText: reply, sender: 'Corona AI' });
-        _renderMessage('ai', reply, 'Corona AI');
-        document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
-      }
-    } catch (err) {
-      removeTyping();
-      addMessage('ai', '⚠️ Could not connect to the server. Make sure the server is running on port 3000.', 'Corona AI');
+    // Show typing indicator if @AI message
+    if (text.toLowerCase().startsWith('@ai')) {
+      sendBtn.disabled = true;
+      setTimeout(() => { sendBtn.disabled = false; }, 3000);
+      showTyping();
     }
 
-    sendBtn.disabled = false;
+    socket.emit('sendMessage', { text });
     document.getElementById('userInput').focus();
   }
 
-  function buildSystemPrompt() {
-    const cls = classInfo[currentClass];
-    return `You are the AI assistant for Corona School Chat — a school communication platform used by students at Corona School.
-
-The student you are currently helping is: ${currentUser}
-Their class is: ${cls.name} (${cls.desc})
-
-About Corona School Chat:
-- This is a structured school chat platform with separate chat rooms for Class 1 through Class 6.
-- Students use this platform to ask questions, get homework help, and learn.
-- Each class has its own dedicated chat room to keep conversations organised.
-
-Your role:
-- Be a warm, encouraging, and knowledgeable school assistant.
-- Tailor your language and explanations to the appropriate level for ${cls.name} students.
-- Help with subjects like Maths, English, Science, Social Studies, and general school topics.
-- Keep responses clear, structured, and easy to understand.
-- Always address the student by their first name when it feels natural.
-- Encourage curiosity and a love of learning.
-- If asked who you are, say you are the Corona School Chat AI assistant.`;
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
   function handleKey(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   }
 
   function autoResize(el) {
@@ -900,17 +609,37 @@ Your role:
     el.style.height = Math.min(el.scrollHeight, 100) + 'px';
   }
 
-  function escapeHtml(text) {
-    return String(text)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;');
+  // ── Petnan Modal ──────────────────────────────────────────────────────────
+  function openPetnan() {
+    document.getElementById('petnanForm').style.display    = 'block';
+    document.getElementById('petnanSuccess').style.display = 'none';
+    document.getElementById('petnanMessage').value         = '';
+    document.getElementById('petnanModal').classList.add('open');
+    setTimeout(() => document.getElementById('petnanMessage').focus(), 100);
   }
+  function closePetnan() { document.getElementById('petnanModal').classList.remove('open'); }
+  function sendToPetnan() {
+    const msg = document.getElementById('petnanMessage').value.trim();
+    if (!msg) return;
+    fetch('/api/petnan', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, timestamp: new Date().toLocaleString() })
+    }).catch(() => {});
+    document.getElementById('petnanForm').style.display    = 'none';
+    document.getElementById('petnanSuccess').style.display = 'block';
+  }
+  document.getElementById('petnanModal').addEventListener('click', function(e) {
+    if (e.target === this) closePetnan();
+  });
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function escapeHtml(text) {
+    return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
   function formatResponse(text) {
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    text = text.replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;">$1</code>');
+    text = text.replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px">$1</code>');
     text = text.replace(/\n/g, '<br>');
     return text;
   }

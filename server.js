@@ -4,182 +4,580 @@ const cors       = require('cors');
 const Groq       = require('groq-sdk');
 const path       = require('path');
 const http       = require('http');
+const fs         = require('fs');
+const nodemailer = require('nodemailer');
 const { Server } = require('socket.io');
+const multer     = require('multer');
+const { v4: uuidv4 } = require('uuid');
 
 const app    = express();
 const server = http.createServer(app);
-const io     = new Server(server);
+const io     = new Server(server, { maxHttpBufferSize: 1e8 });
 
+// ── Uploads directory ──────────────────────────────────────────────────────────
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename:    (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${uuidv4()}${ext}`);
+  },
+});
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+app.use('/uploads', express.static(uploadsDir));
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// ── Per-class message history (kept in memory) ─────────────────────────────────
-// Structure: { 1: [ {sender, text, type, timestamp} ], 2: [...], ... }
-const classRooms = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+// ── Student roster ─────────────────────────────────────────────────────────────
+const STUDENTS = [
+  { name: 'Toni Macauly',               password: 'Toni123'         },
+  { name: 'Oghenetejiri Ogheneochukwu', password: 'Oghenetejiri123' },
+  { name: 'Joanna Bogoro',              password: 'Joanna123'       },
+  { name: 'Ama-Abasi Benson',           password: 'Ama123'          },
+  { name: 'Oluyemi Sosan',              password: 'Oluyemi123'      },
+  { name: 'Aisha Adeniyi',              password: 'Aisha123'        },
+  { name: 'Elissa Ojei',                password: 'Elissa123'       },
+  { name: 'Kwame Sagoe',                password: 'Kwame123'        },
+  { name: 'Oluwafeyikunmi Osunsedo',    password: 'Feyi123'         },
+  { name: 'Olayomade King',             password: 'Yomade123'       },
+  { name: 'Anthonia Celey Okogun',      password: 'Anthonia123'     },
+  { name: 'Netochi Anichebe',           password: 'Netochi123'      },
+  { name: 'Ishaq Babalola',             password: 'Ishaq123'        },
+  { name: 'Eliora Ighodalo',            password: 'Eliora123'       },
+  { name: 'Oluwanifesimi Thomas',       password: 'Nifesimi123'     },
+  { name: 'Ereremena Orife',            password: 'Ereremena123'    },
+  { name: 'Petnan Fwangkwal',           password: 'Petnan123'       },
+  { name: 'Fareedah Ibrahim',           password: 'Fareedah123'     },
+  { name: 'Tamunomiebi Miebaga',        password: 'Tamuno123'       },
+  { name: 'Adedamola Egbonwon',         password: 'Adedamola123'    },
+  { name: 'Fievaoghene Atebe',          password: 'Fieva123'        },
+  { name: 'Ethan Adeleke',              password: 'Ethan123'        },
+];
 
-const classDescriptions = {
-  1: 'Primary 1 – foundations of literacy, numeracy, and discovery.',
-  2: 'Primary 2 – building reading, writing, and basic maths skills.',
-  3: 'Primary 3 – expanding knowledge in science, maths, and language.',
-  4: 'Primary 4 – introduction to structured learning and critical thinking.',
-  5: 'Primary 5 – deeper subject exploration and project work.',
-  6: 'Primary 6 – exam preparation and final year of primary school.',
-};
+// ── In-memory profile + coins store ───────────────────────────────────────────
+// profileStore[name] = { avatar, bio, status, coins, premium, premiumSince, studyMinutes }
+const profileStore = {};
 
-function buildSystemPrompt(className, senderName) {
-  return `You are the AI assistant for Corona School Chat — a school communication platform.
-The student asking is: ${senderName}
-Their class: ${className} (${classDescriptions[parseInt(className.replace('Class ', ''))] || ''})
-Be warm, helpful, and age-appropriate. Keep answers clear and encouraging.
-If asked who you are, say you are the Corona School Chat AI assistant.`;
+function getProfile(name) {
+  if (!profileStore[name]) {
+    profileStore[name] = {
+      avatar: null, bio: '', status: 'online',
+      coins: 0, premium: false, premiumSince: null,
+      studyMinutes: 0,
+    };
+  }
+  return profileStore[name];
 }
 
-// ── Socket.io ──────────────────────────────────────────────────────────────────
-io.on('connection', (socket) => {
-  console.log(`🔌 User connected: ${socket.id}`);
+// ── Study session tracker ──────────────────────────────────────────────────────
+// studySessions[name] = { startTime, intervalId }
+const studySessions = {};
 
-  // Helper: broadcast online users for a room
-  function broadcastOnline(room) {
-    const users = [];
-    io.sockets.sockets.forEach(s => {
-      if (s.data.room === room && s.data.name) users.push(s.data.name);
-    });
-    io.to(room).emit('onlineUsers', users);
+const COINS_PER_30MIN  = 100;   // earn 100 coins every 30 min of study
+const PREMIUM_COST     = 2000;  // 2000 coins to buy premium
+const STUDY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+function startStudySession(name, socket) {
+  if (studySessions[name]) return; // already running
+  studySessions[name] = {
+    startTime: Date.now(),
+    intervalId: setInterval(() => {
+      const p = getProfile(name);
+      p.coins += COINS_PER_30MIN;
+      p.studyMinutes += 30;
+      console.log(`🪙 ${name} earned ${COINS_PER_30MIN} coins (total: ${p.coins})`);
+      // Notify the student
+      Object.entries(connectedUsers).forEach(([sid, u]) => {
+        if (u.name === name) {
+          io.to(sid).emit('coinsEarned', { coins: COINS_PER_30MIN, total: p.coins, reason: '30 minutes of study!' });
+          io.to(sid).emit('profileData', { name, profile: p });
+        }
+      });
+    }, STUDY_INTERVAL_MS),
+  };
+  console.log(`📚 ${name} started study session`);
+}
+
+function stopStudySession(name) {
+  if (studySessions[name]) {
+    clearInterval(studySessions[name].intervalId);
+    delete studySessions[name];
+    console.log(`📚 ${name} stopped study session`);
   }
+}
 
-  // Student joins a class room
-  socket.on('joinClass', ({ name, classNum }) => {
-    // Leave any previous rooms (except own socket room)
-    [...socket.rooms].forEach(r => { if (r !== socket.id) socket.leave(r); });
+// ── Message stores ─────────────────────────────────────────────────────────────
+const generalMessages = [];
+const dmMessages      = {};  // { "UserA||UserB": [ msg ] }
+const groupRooms      = {};  // { groupId: { name, members, messages, createdBy, avatar } }
+const homeworkStore   = [];
+const aiConversations = {}; // { name: [ {role, content} ] } — per-student private AI history
 
-    const room = `class_${classNum}`;
-    socket.join(room);
-    socket.data.name     = name;
-    socket.data.classNum = classNum;
-    socket.data.room     = room;
+function dmKey(a, b) { return [a, b].sort().join('||'); }
 
-    // Send existing history to the joining student
-    socket.emit('history', classRooms[classNum] || []);
+// ── Nodemailer ─────────────────────────────────────────────────────────────────
+let mailer = null;
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  mailer = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+  });
+}
 
-    // Notify others in the room
-    const joinMsg = {
-      sender:    'System',
-      text:      `${name} joined Class ${classNum}`,
-      type:      'system',
-      timestamp: new Date().toISOString(),
-    };
-    socket.to(room).emit('message', joinMsg);
-    broadcastOnline(room);
-    console.log(`👤 ${name} joined Class ${classNum}`);
+async function sendForgotPasswordEmail(fromName, message) {
+  const body = `5 GREEN CHAT — Forgot Password Request\n--------------------------------------\nFrom: ${fromName}\nMessage: ${message}\nTime: ${new Date().toLocaleString()}\n\nPlease reply to this student with their password.`;
+  console.log('\n📧 Forgot Password Request:\n', body);
+  if (mailer) {
+    await mailer.sendMail({
+      from:    process.env.EMAIL_USER,
+      to:      'petnan2016@gmail.com',
+      subject: `[5 Green Chat] Password Help — ${fromName}`,
+      text:    body,
+    });
+  }
+}
+
+// ── AI system prompt ───────────────────────────────────────────────────────────
+const AI_SYSTEM_PROMPT = `You are 5 GREEN AI — the brilliant, all-knowing AI assistant of 5 Green Chat, built for 5 Green class students.
+
+You are extraordinarily intelligent and knowledgeable across ALL subjects and domains:
+• Mathematics (arithmetic, algebra, geometry, calculus, statistics)
+• Sciences (physics, chemistry, biology, earth science, astronomy)
+• History & Geography (world history, Nigerian history, African history, maps, capitals)
+• English Language & Literature (grammar, writing, essays, poetry, novels)
+• Computer Science & Coding (Python, JavaScript, HTML, algorithms, logic)
+• Arts, Music, Sports, Health & Physical Education
+• Social Studies, Civic Education, Economics
+• Languages (English, French, Yoruba, Igbo, Hausa, and more)
+• Logic, Philosophy, Critical Thinking
+• Current Events & General Knowledge
+
+Your personality:
+• Warm, encouraging, and supportive — you celebrate student effort
+• Patient: you explain things multiple ways until understood
+• Engaging: you use examples, analogies, stories, and humour appropriately
+• Honest: if something is beyond your training data, you say so
+• Age-appropriate: you speak at the right level for school students
+
+Your creator is Petnan Fwangkwal, the AI Creator of 5 Green Chat.
+
+You can:
+✅ Solve maths problems step-by-step
+✅ Explain any concept clearly
+✅ Help write essays, stories, and assignments
+✅ Translate between languages
+✅ Quiz students and test their knowledge
+✅ Give study tips and learning strategies
+✅ Summarise texts and books
+✅ Answer general knowledge questions
+✅ Help with coding problems
+✅ Provide homework help
+
+Never refuse to help with legitimate school or learning questions. Always aim to be the most helpful tutor possible.`;
+
+// ── Socket.io ──────────────────────────────────────────────────────────────────
+const connectedUsers = {}; // { socketId: { name, socketId } }
+
+io.on('connection', (socket) => {
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+  socket.on('login', ({ name, password }) => {
+    const student = STUDENTS.find(s => s.name === name && s.password === password);
+    if (!student) {
+      socket.emit('loginError', 'Wrong name or password. Please try again.');
+      return;
+    }
+    socket.data.name = name;
+    connectedUsers[socket.id] = { name, socketId: socket.id };
+    const profile = getProfile(name);
+
+    socket.emit('loginSuccess', {
+      name,
+      profile,
+      students: STUDENTS.map(s => ({
+        name:    s.name,
+        profile: getProfile(s.name),
+        online:  Object.values(connectedUsers).some(u => u.name === s.name),
+      })),
+      groups: Object.values(groupRooms).filter(g => g.members.includes(name)),
+      coins:   profile.coins,
+      premium: profile.premium,
+    });
+
+    socket.emit('generalHistory',  generalMessages.slice(-100));
+    socket.emit('homeworkList',    homeworkStore);
+
+    broadcastOnlineUsers();
+
+    // Rejoin group socket rooms
+    Object.values(groupRooms).forEach(g => {
+      if (g.members.includes(name)) socket.join(`group_${g.id}`);
+    });
+
+    console.log(`✅ ${name} logged in`);
   });
 
-  // Student sends a message
-  socket.on('sendMessage', async ({ text }) => {
-    const { name, classNum, room } = socket.data;
-    if (!name || !room) return;
-
+  // ── General chat ──────────────────────────────────────────────────────────
+  socket.on('generalMessage', ({ text, replyTo }) => {
+    const name = socket.data.name;
+    if (!name || !text) return;
     const msg = {
-      sender:    name,
-      text:      text.trim(),
-      type:      'student',
-      timestamp: new Date().toISOString(),
+      id: uuidv4(), sender: name, text: text.trim(),
+      replyTo: replyTo || null, timestamp: new Date().toISOString(),
+      type: 'student', premium: getProfile(name).premium,
     };
-
-    // Save and broadcast to everyone in the room (including sender)
-    classRooms[classNum].push(msg);
-    io.to(room).emit('message', msg);
-
-    // If message starts with @AI, trigger AI response
-    if (text.trim().toLowerCase().startsWith('@ai')) {
-      const question = text.trim().replace(/^@ai\s*/i, '').trim();
-      if (!question) return;
-
-      // Build conversation history for this class (student+AI messages only)
-      const history = (classRooms[classNum] || [])
-        .filter(m => m.type === 'student' || m.type === 'ai')
-        .slice(-20) // last 20 messages for context
-        .map(m => ({
-          role:    m.type === 'ai' ? 'assistant' : 'user',
-          content: m.type === 'ai' ? m.text : `${m.sender}: ${m.text}`,
-        }));
-
-      try {
-        const completion = await groq.chat.completions.create({
-          model:       'llama-3.1-8b-instant',
-          messages:    [
-            { role: 'system', content: buildSystemPrompt(`Class ${classNum}`, name) },
-            ...history,
-          ],
-          max_tokens:  1000,
-          temperature: 0.7,
-          stream:      false,
-        });
-
-        const aiReply = completion.choices[0].message.content;
-        const aiMsg = {
-          sender:    'Corona AI',
-          text:      aiReply,
-          type:      'ai',
-          replyTo:   name,
-          timestamp: new Date().toISOString(),
-        };
-
-        classRooms[classNum].push(aiMsg);
-        io.to(room).emit('message', aiMsg);
-
-      } catch (err) {
-        console.error('Groq error:', err.message);
-        const errMsg = {
-          sender:    'Corona AI',
-          text:      '⚠️ Sorry, I could not process that. Please try again.',
-          type:      'ai',
-          timestamp: new Date().toISOString(),
-        };
-        io.to(room).emit('message', errMsg);
-      }
-    }
+    generalMessages.push(msg);
+    if (generalMessages.length > 500) generalMessages.shift();
+    io.emit('generalMessage', msg);
   });
 
-  socket.on('disconnect', () => {
-    const { name, classNum, room } = socket.data;
-    if (name && room) {
-      const leaveMsg = {
-        sender:    'System',
-        text:      `${name} left the chat`,
-        type:      'system',
-        timestamp: new Date().toISOString(),
+  // ── AI chat (private per student) ─────────────────────────────────────────
+  socket.on('aiMessage', async ({ text }) => {
+    const name = socket.data.name;
+    if (!name || !text) return;
+
+    if (!aiConversations[name]) aiConversations[name] = [];
+
+    const userMsg = {
+      id: uuidv4(), sender: name, text: text.trim(),
+      timestamp: new Date().toISOString(), type: 'student',
+    };
+    socket.emit('aiMessage', userMsg);
+    socket.emit('aiTyping', true);
+
+    // Build history for this student
+    aiConversations[name].push({ role: 'user', content: text.trim() });
+    // Keep last 20 turns
+    if (aiConversations[name].length > 40) aiConversations[name].splice(0, 2);
+
+    try {
+      const completion = await groq.chat.completions.create({
+        model:       'llama-3.3-70b-versatile',
+        messages:    [{ role: 'system', content: AI_SYSTEM_PROMPT }, ...aiConversations[name]],
+        max_tokens:  2048,
+        temperature: 0.7,
+        stream:      false,
+      });
+      const reply = completion.choices[0].message.content;
+      aiConversations[name].push({ role: 'assistant', content: reply });
+
+      const aiMsg = {
+        id: uuidv4(), sender: '5 GREEN AI', text: reply,
+        timestamp: new Date().toISOString(), type: 'ai',
       };
-      socket.to(room).emit('message', leaveMsg);
-      broadcastOnline(room);
+      socket.emit('aiTyping', false);
+      socket.emit('aiMessage', aiMsg);
+    } catch (err) {
+      console.error('AI error:', err.message);
+      socket.emit('aiTyping', false);
+      socket.emit('aiMessage', {
+        id: uuidv4(), sender: '5 GREEN AI', type: 'ai',
+        text: '⚠️ Sorry, I had a little trouble with that. Please try again in a moment!',
+        timestamp: new Date().toISOString(),
+      });
     }
-    console.log(`🔌 Disconnected: ${socket.id}`);
   });
+
+  // ── DMs ───────────────────────────────────────────────────────────────────
+  socket.on('getDM', ({ with: other }) => {
+    const name = socket.data.name;
+    if (!name) return;
+    const key = dmKey(name, other);
+    socket.emit('dmHistory', { with: other, messages: (dmMessages[key] || []).slice(-100) });
+  });
+
+  socket.on('dmMessage', ({ to, text, replyTo }) => {
+    const from = socket.data.name;
+    if (!from || !to || !text) return;
+    const key = dmKey(from, to);
+    if (!dmMessages[key]) dmMessages[key] = [];
+    const msg = {
+      id: uuidv4(), sender: from, to, text: text.trim(),
+      replyTo: replyTo || null, timestamp: new Date().toISOString(),
+      type: 'dm', premium: getProfile(from).premium,
+    };
+    dmMessages[key].push(msg);
+    if (dmMessages[key].length > 500) dmMessages[key].shift();
+    Object.entries(connectedUsers).forEach(([sid, u]) => {
+      if (u.name === to) io.to(sid).emit('dmMessage', msg);
+    });
+    socket.emit('dmMessage', msg);
+  });
+
+  // ── Groups ────────────────────────────────────────────────────────────────
+  socket.on('createGroup', ({ name: groupName, members }) => {
+    const creator = socket.data.name;
+    if (!creator || !groupName) return;
+    const allMembers = [...new Set([creator, ...members])];
+    const id = uuidv4();
+    groupRooms[id] = { id, name: groupName, members: allMembers, messages: [], createdBy: creator, avatar: null };
+
+    Object.entries(connectedUsers).forEach(([sid, u]) => {
+      if (allMembers.includes(u.name)) {
+        io.to(sid).emit('groupCreated', groupRooms[id]);
+        io.sockets.sockets.get(sid)?.join(`group_${id}`);
+      }
+    });
+    socket.join(`group_${id}`);
+    console.log(`📁 Group "${groupName}" created by ${creator}`);
+  });
+
+  socket.on('getGroup', ({ groupId }) => {
+    const name = socket.data.name;
+    const g = groupRooms[groupId];
+    if (!g || !g.members.includes(name)) return;
+    socket.emit('groupHistory', { groupId, messages: g.messages.slice(-100) });
+  });
+
+  socket.on('groupMessage', ({ groupId, text, replyTo }) => {
+    const name = socket.data.name;
+    const g = groupRooms[groupId];
+    if (!name || !g || !g.members.includes(name) || !text) return;
+    const msg = {
+      id: uuidv4(), sender: name, text: text.trim(),
+      replyTo: replyTo || null, timestamp: new Date().toISOString(),
+      type: 'group', groupId, premium: getProfile(name).premium,
+    };
+    g.messages.push(msg);
+    if (g.messages.length > 500) g.messages.shift();
+    io.to(`group_${groupId}`).emit('groupMessage', msg);
+  });
+
+  socket.on('addToGroup', ({ groupId, memberName }) => {
+    const name = socket.data.name;
+    const g = groupRooms[groupId];
+    if (!name || !g || !g.members.includes(name)) return;
+    if (!g.members.includes(memberName)) {
+      g.members.push(memberName);
+      io.to(`group_${groupId}`).emit('groupUpdated', g);
+      Object.entries(connectedUsers).forEach(([sid, u]) => {
+        if (u.name === memberName) {
+          io.to(sid).emit('groupCreated', g);
+          io.sockets.sockets.get(sid)?.join(`group_${groupId}`);
+        }
+      });
+    }
+  });
+
+  socket.on('leaveGroup', ({ groupId }) => {
+    const name = socket.data.name;
+    const g = groupRooms[groupId];
+    if (!name || !g) return;
+    g.members = g.members.filter(m => m !== name);
+    socket.leave(`group_${groupId}`);
+    socket.emit('groupLeft', { groupId });
+    io.to(`group_${groupId}`).emit('groupUpdated', g);
+  });
+
+  // ── Profile updates ───────────────────────────────────────────────────────
+  socket.on('updateProfile', ({ avatar, bio, status }) => {
+    const name = socket.data.name;
+    if (!name) return;
+    const p = getProfile(name);
+    if (avatar !== undefined) p.avatar = avatar;
+    if (bio    !== undefined) p.bio    = bio;
+    if (status !== undefined) p.status = status;
+    io.emit('profileUpdated', { name, profile: p });
+  });
+
+  socket.on('getProfile', ({ name: targetName }) => {
+    const p = getProfile(targetName);
+    socket.emit('profileData', { name: targetName, profile: p });
+  });
+
+  // ── Homework ──────────────────────────────────────────────────────────────
+  socket.on('postHomework', ({ title, description, subject, dueDate }) => {
+    const name = socket.data.name;
+    if (!name || !title) return;
+    const hw = {
+      id: uuidv4(), postedBy: name, title, description,
+      subject, dueDate, timestamp: new Date().toISOString(),
+      comments: [], submissions: [],
+    };
+    homeworkStore.unshift(hw);
+    if (homeworkStore.length > 200) homeworkStore.pop();
+    io.emit('homeworkPosted', hw);
+  });
+
+  socket.on('homeworkComment', ({ hwId, text }) => {
+    const name = socket.data.name;
+    const hw = homeworkStore.find(h => h.id === hwId);
+    if (!name || !hw || !text) return;
+    const comment = { id: uuidv4(), sender: name, text, timestamp: new Date().toISOString() };
+    hw.comments.push(comment);
+    io.emit('homeworkComment', { hwId, comment });
+  });
+
+  socket.on('submitHomework', ({ hwId, text }) => {
+    const name = socket.data.name;
+    const hw = homeworkStore.find(h => h.id === hwId);
+    if (!name || !hw || !text) return;
+    // Remove previous submission by same student
+    hw.submissions = hw.submissions.filter(s => s.sender !== name);
+    const sub = { id: uuidv4(), sender: name, text, timestamp: new Date().toISOString() };
+    hw.submissions.push(sub);
+    io.emit('homeworkSubmission', { hwId, submission: sub });
+  });
+
+  // ── Class Coins & Premium ─────────────────────────────────────────────────
+  socket.on('startStudy', () => {
+    const name = socket.data.name;
+    if (!name) return;
+    startStudySession(name, socket);
+    socket.emit('studyStarted', { message: 'Study session started! Earn 100 coins every 30 minutes.' });
+  });
+
+  socket.on('stopStudy', () => {
+    const name = socket.data.name;
+    if (!name) return;
+    stopStudySession(name);
+    socket.emit('studyStopped', { message: 'Study session ended.' });
+  });
+
+  socket.on('buyPremium', () => {
+    const name = socket.data.name;
+    if (!name) return;
+    const p = getProfile(name);
+    if (p.premium) {
+      socket.emit('premiumError', 'You already have Premium!');
+      return;
+    }
+    if (p.coins < PREMIUM_COST) {
+      socket.emit('premiumError', `You need ${PREMIUM_COST} coins. You have ${p.coins}. Keep studying!`);
+      return;
+    }
+    p.coins -= PREMIUM_COST;
+    p.premium = true;
+    p.premiumSince = new Date().toISOString();
+    console.log(`⭐ ${name} purchased Premium`);
+    socket.emit('premiumUnlocked', { profile: p });
+    io.emit('profileUpdated', { name, profile: p });
+  });
+
+  socket.on('getCoins', () => {
+    const name = socket.data.name;
+    if (!name) return;
+    const p = getProfile(name);
+    socket.emit('coinsData', { coins: p.coins, premium: p.premium, studyMinutes: p.studyMinutes });
+  });
+
+  // ── Video call signalling (WebRTC) ────────────────────────────────────────
+  socket.on('callUser', ({ to, offer, from }) => {
+    Object.entries(connectedUsers).forEach(([sid, u]) => {
+      if (u.name === to) io.to(sid).emit('incomingCall', { from, offer, socketId: socket.id });
+    });
+  });
+
+  socket.on('callAnswer', ({ to, answer }) => {
+    Object.entries(connectedUsers).forEach(([sid, u]) => {
+      if (u.name === to) io.to(sid).emit('callAnswered', { answer, from: socket.data.name });
+    });
+  });
+
+  socket.on('callDecline', ({ to }) => {
+    Object.entries(connectedUsers).forEach(([sid, u]) => {
+      if (u.name === to) io.to(sid).emit('callDeclined', { from: socket.data.name });
+    });
+  });
+
+  socket.on('iceCandidate', ({ to, candidate }) => {
+    Object.entries(connectedUsers).forEach(([sid, u]) => {
+      if (u.name === to) io.to(sid).emit('iceCandidate', { from: socket.data.name, candidate });
+    });
+  });
+
+  socket.on('endCall', ({ to }) => {
+    Object.entries(connectedUsers).forEach(([sid, u]) => {
+      if (u.name === to) io.to(sid).emit('callEnded', { from: socket.data.name });
+    });
+  });
+
+  // In-call chat messages
+  socket.on('callChatMessage', ({ to, text }) => {
+    const from = socket.data.name;
+    if (!from || !to || !text) return;
+    const msg = { sender: from, text, timestamp: new Date().toISOString() };
+    Object.entries(connectedUsers).forEach(([sid, u]) => {
+      if (u.name === to) io.to(sid).emit('callChatMessage', msg);
+    });
+    socket.emit('callChatMessage', msg);
+  });
+
+  // ── Typing indicators ─────────────────────────────────────────────────────
+  socket.on('typing', ({ channel, to }) => {
+    const name = socket.data.name;
+    if (!name) return;
+    if (channel === 'general') {
+      socket.broadcast.emit('userTyping', { name, channel: 'general' });
+    } else if (channel === 'dm' && to) {
+      Object.entries(connectedUsers).forEach(([sid, u]) => {
+        if (u.name === to) io.to(sid).emit('userTyping', { name, channel: 'dm', from: name });
+      });
+    } else if (channel === 'group' && to) {
+      socket.to(`group_${to}`).emit('userTyping', { name, channel: 'group', groupId: to });
+    }
+  });
+
+  socket.on('stopTyping', ({ channel, to }) => {
+    const name = socket.data.name;
+    if (!name) return;
+    if (channel === 'general') {
+      socket.broadcast.emit('userStopTyping', { name, channel: 'general' });
+    } else if (channel === 'dm' && to) {
+      Object.entries(connectedUsers).forEach(([sid, u]) => {
+        if (u.name === to) io.to(sid).emit('userStopTyping', { name, channel: 'dm', from: name });
+      });
+    }
+  });
+
+  // ── Disconnect ────────────────────────────────────────────────────────────
+  socket.on('disconnect', () => {
+    const name = socket.data.name;
+    stopStudySession(name);
+    delete connectedUsers[socket.id];
+    broadcastOnlineUsers();
+    console.log(`🔌 Disconnected: ${name || socket.id}`);
+  });
+
+  function broadcastOnlineUsers() {
+    const online = [...new Set(Object.values(connectedUsers).map(u => u.name))];
+    io.emit('onlineUsers', online);
+  }
 });
 
-// ── Petnan messages ────────────────────────────────────────────────────────────
-app.post('/api/petnan', (req, res) => {
-  const { message, timestamp } = req.body;
-  console.log(`\n📩 [Message for Petnan] ${timestamp}`);
-  console.log(`   "${message}"\n`);
-  res.json({ ok: true });
+// ── REST: Forgot password ──────────────────────────────────────────────────────
+app.post('/api/forgot-password', async (req, res) => {
+  const { name, message } = req.body;
+  if (!message) return res.status(400).json({ error: 'Message required' });
+  try {
+    await sendForgotPasswordEmail(name || 'Unknown student', message);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Email error:', err.message);
+    res.json({ ok: true });
+  }
 });
 
-// ── Health check ───────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Corona School Chat server is running.' });
+// ── REST: Upload avatar ────────────────────────────────────────────────────────
+app.post('/api/upload-avatar', upload.single('avatar'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  res.json({ url: `/uploads/${req.file.filename}` });
 });
+
+// ── Health ─────────────────────────────────────────────────────────────────────
+app.get('/api/health', (req, res) => res.json({ status: 'ok', students: STUDENTS.length }));
 
 // ── Serve frontend ─────────────────────────────────────────────────────────────
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`\n🏫 Corona School Chat running at http://localhost:${PORT}`);
-  console.log(`📌 Groq API key needed in .env: GROQ_API_KEY=gsk_...`);
-  console.log(`💬 Real-time chat enabled via Socket.io\n`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🟢 5 Green Chat running at http://0.0.0.0:${PORT}\n`);
+  console.log(`📚 ${STUDENTS.length} students registered`);
+  console.log(`🪙 Coins: ${COINS_PER_30MIN} per 30min study | Premium costs ${PREMIUM_COST} coins\n`);
 });
